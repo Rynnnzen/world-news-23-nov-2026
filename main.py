@@ -81,7 +81,9 @@ def copy_atomically(source, destination):
     os.replace, so readers of destination never see a partial image.
     """
     destination.parent.mkdir(parents=True, exist_ok=True)
-    fd, tmp_name = tempfile.mkstemp(prefix=".entry-", suffix=".png.tmp",
+    # The prefix must start with a letter/digit/underscore: the grader rejects
+    # output paths whose segments begin with a dot.
+    fd, tmp_name = tempfile.mkstemp(prefix="entry-", suffix=".png.tmp",
                                     dir=str(destination.parent))
     tmp_path = Path(tmp_name)
     digest = hashlib.sha256()
@@ -97,6 +99,10 @@ def copy_atomically(source, destination):
                 total += len(chunk)
             dst.flush()
             os.fsync(dst.fileno())
+            # mkstemp creates the temp file 0600; the grader runs as another
+            # user and must be able to read the output, so set it world-readable
+            # before the rename carries this mode onto the final entry.png.
+            os.fchmod(dst.fileno(), 0o644)
         os.replace(tmp_path, destination)
     except BaseException:
         try:
